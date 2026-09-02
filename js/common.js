@@ -99,6 +99,8 @@ window.onload = function(){
 	
 	//返回首页
 	com.get("gohomeBtn").addEventListener("click", function(e) {
+		play.cancelPendingAI();
+		play.isPlay = false;
 		com.get("chessBox").style.display = "none";
 		com.get("menuBox").style.display = "block";
 		com.get("indexBox").style.display = "block";
@@ -290,6 +292,55 @@ com.arr2Clone = function (arr){
 	return newArr;
 }
 
+// 判断指定一方的将/帅在当前棋盘上是否安全
+com.isKingSafe = function (map, my){
+	var kingKey = my === 1 ? "j0" : "J0";
+	var kingX = -1;
+	var kingY = -1;
+	for (var y=0; y<map.length; y++){
+		for (var x=0; x<map[y].length; x++){
+			if (map[y][x] == kingKey){
+				kingX = x;
+				kingY = y;
+			}
+		}
+	}
+	if (kingX < 0) return false;
+
+	for (var y=0; y<map.length; y++){
+		for (var x=0; x<map[y].length; x++){
+			var key = map[y][x];
+			if (!key || !com.mans[key] || com.mans[key].my == my) continue;
+			var pater = key.slice(0,1);
+			var points = com.bylaw[com.args[pater].bl](x,y,map,-my);
+			for (var i=0; i<points.length; i++){
+				if (points[i][0] == kingX && points[i][1] == kingY) return false;
+			}
+		}
+	}
+	return true;
+}
+
+// 先生成棋子的几何着法，再排除会让己方将/帅被攻击的非法着法
+com.getLegalMoves = function (map, key, x, y){
+	var man = com.mans[key];
+	var pater = key.slice(0,1);
+	var points = com.bylaw[com.args[pater].bl](x,y,map,man.my);
+	var legal = [];
+	for (var i=0; i<points.length; i++){
+		var newX = points[i][0];
+		var newY = points[i][1];
+		var clearKey = map[newY][newX];
+		map[newY][newX] = key;
+		delete map[y][x];
+		if (com.isKingSafe(map,man.my)) legal.push(points[i]);
+		map[y][x] = key;
+		if (clearKey) map[newY][newX] = clearKey;
+		else delete map[newY][newX];
+	}
+	return legal;
+}
+
 //ajax载入数据
 com.getData = function (url,fun){
 	var XMLHttpRequestObject=false;
@@ -387,7 +438,7 @@ com.keys = {
 	"p0":"p","p1":"p",
 	"z0":"z","z1":"z","z2":"z","z3":"z","z4":"z","z5":"z",
 	
-	"C0":"c","C1":"C",
+	"C0":"C","C1":"C",
 	"M0":"M","M1":"M",
 	"X0":"X","X1":"X",
 	"S0":"S","S1":"S",
@@ -444,21 +495,21 @@ com.bylaw.c = function (x,y,map,my){
 com.bylaw.m = function (x,y,map,my){
 	var d=[];
 		//1点
-		if ( y-2>= 0 && x+1<= 8 && !play.map[y-1][x] &&(!com.mans[map[y-2][x+1]] || com.mans[map[y-2][x+1]].my!=my)) d.push([x+1,y-2]);
+		if ( y-2>= 0 && x+1<= 8 && !map[y-1][x] &&(!com.mans[map[y-2][x+1]] || com.mans[map[y-2][x+1]].my!=my)) d.push([x+1,y-2]);
 		//2点
-		if ( y-1>= 0 && x+2<= 8 && !play.map[y][x+1] &&(!com.mans[map[y-1][x+2]] || com.mans[map[y-1][x+2]].my!=my)) d.push([x+2,y-1]);
+		if ( y-1>= 0 && x+2<= 8 && !map[y][x+1] &&(!com.mans[map[y-1][x+2]] || com.mans[map[y-1][x+2]].my!=my)) d.push([x+2,y-1]);
 		//4点
-		if ( y+1<= 9 && x+2<= 8 && !play.map[y][x+1] &&(!com.mans[map[y+1][x+2]] || com.mans[map[y+1][x+2]].my!=my)) d.push([x+2,y+1]);
+		if ( y+1<= 9 && x+2<= 8 && !map[y][x+1] &&(!com.mans[map[y+1][x+2]] || com.mans[map[y+1][x+2]].my!=my)) d.push([x+2,y+1]);
 		//5点
-		if ( y+2<= 9 && x+1<= 8 && !play.map[y+1][x] &&(!com.mans[map[y+2][x+1]] || com.mans[map[y+2][x+1]].my!=my)) d.push([x+1,y+2]);
+		if ( y+2<= 9 && x+1<= 8 && !map[y+1][x] &&(!com.mans[map[y+2][x+1]] || com.mans[map[y+2][x+1]].my!=my)) d.push([x+1,y+2]);
 		//7点
-		if ( y+2<= 9 && x-1>= 0 && !play.map[y+1][x] &&(!com.mans[map[y+2][x-1]] || com.mans[map[y+2][x-1]].my!=my)) d.push([x-1,y+2]);
+		if ( y+2<= 9 && x-1>= 0 && !map[y+1][x] &&(!com.mans[map[y+2][x-1]] || com.mans[map[y+2][x-1]].my!=my)) d.push([x-1,y+2]);
 		//8点
-		if ( y+1<= 9 && x-2>= 0 && !play.map[y][x-1] &&(!com.mans[map[y+1][x-2]] || com.mans[map[y+1][x-2]].my!=my)) d.push([x-2,y+1]);
+		if ( y+1<= 9 && x-2>= 0 && !map[y][x-1] &&(!com.mans[map[y+1][x-2]] || com.mans[map[y+1][x-2]].my!=my)) d.push([x-2,y+1]);
 		//10点
-		if ( y-1>= 0 && x-2>= 0 && !play.map[y][x-1] &&(!com.mans[map[y-1][x-2]] || com.mans[map[y-1][x-2]].my!=my)) d.push([x-2,y-1]);
+		if ( y-1>= 0 && x-2>= 0 && !map[y][x-1] &&(!com.mans[map[y-1][x-2]] || com.mans[map[y-1][x-2]].my!=my)) d.push([x-2,y-1]);
 		//11点
-		if ( y-2>= 0 && x-1>= 0 && !play.map[y-1][x] &&(!com.mans[map[y-2][x-1]] || com.mans[map[y-2][x-1]].my!=my)) d.push([x-1,y-2]);
+		if ( y-2>= 0 && x-1>= 0 && !map[y-1][x] &&(!com.mans[map[y-2][x-1]] || com.mans[map[y-2][x-1]].my!=my)) d.push([x-1,y-2]);
 
 	return d;
 }
@@ -468,22 +519,22 @@ com.bylaw.x = function (x,y,map,my){
 	var d=[];
 	if (my===1){ //红方
 		//4点半
-		if ( y+2<= 9 && x+2<= 8 && !play.map[y+1][x+1] && (!com.mans[map[y+2][x+2]] || com.mans[map[y+2][x+2]].my!=my)) d.push([x+2,y+2]);
+		if ( y+2<= 9 && x+2<= 8 && !map[y+1][x+1] && (!com.mans[map[y+2][x+2]] || com.mans[map[y+2][x+2]].my!=my)) d.push([x+2,y+2]);
 		//7点半
-		if ( y+2<= 9 && x-2>= 0 && !play.map[y+1][x-1] && (!com.mans[map[y+2][x-2]] || com.mans[map[y+2][x-2]].my!=my)) d.push([x-2,y+2]);
+		if ( y+2<= 9 && x-2>= 0 && !map[y+1][x-1] && (!com.mans[map[y+2][x-2]] || com.mans[map[y+2][x-2]].my!=my)) d.push([x-2,y+2]);
 		//1点半
-		if ( y-2>= 5 && x+2<= 8 && !play.map[y-1][x+1] && (!com.mans[map[y-2][x+2]] || com.mans[map[y-2][x+2]].my!=my)) d.push([x+2,y-2]);
+		if ( y-2>= 5 && x+2<= 8 && !map[y-1][x+1] && (!com.mans[map[y-2][x+2]] || com.mans[map[y-2][x+2]].my!=my)) d.push([x+2,y-2]);
 		//10点半
-		if ( y-2>= 5 && x-2>= 0 && !play.map[y-1][x-1] && (!com.mans[map[y-2][x-2]] || com.mans[map[y-2][x-2]].my!=my)) d.push([x-2,y-2]);
+		if ( y-2>= 5 && x-2>= 0 && !map[y-1][x-1] && (!com.mans[map[y-2][x-2]] || com.mans[map[y-2][x-2]].my!=my)) d.push([x-2,y-2]);
 	}else{
 		//4点半
-		if ( y+2<= 4 && x+2<= 8 && !play.map[y+1][x+1] && (!com.mans[map[y+2][x+2]] || com.mans[map[y+2][x+2]].my!=my)) d.push([x+2,y+2]);
+		if ( y+2<= 4 && x+2<= 8 && !map[y+1][x+1] && (!com.mans[map[y+2][x+2]] || com.mans[map[y+2][x+2]].my!=my)) d.push([x+2,y+2]);
 		//7点半
-		if ( y+2<= 4 && x-2>= 0 && !play.map[y+1][x-1] && (!com.mans[map[y+2][x-2]] || com.mans[map[y+2][x-2]].my!=my)) d.push([x-2,y+2]);
+		if ( y+2<= 4 && x-2>= 0 && !map[y+1][x-1] && (!com.mans[map[y+2][x-2]] || com.mans[map[y+2][x-2]].my!=my)) d.push([x-2,y+2]);
 		//1点半
-		if ( y-2>= 0 && x+2<= 8 && !play.map[y-1][x+1] && (!com.mans[map[y-2][x+2]] || com.mans[map[y-2][x+2]].my!=my)) d.push([x+2,y-2]);
+		if ( y-2>= 0 && x+2<= 8 && !map[y-1][x+1] && (!com.mans[map[y-2][x+2]] || com.mans[map[y-2][x+2]].my!=my)) d.push([x+2,y-2]);
 		//10点半
-		if ( y-2>= 0 && x-2>= 0 && !play.map[y-1][x-1] && (!com.mans[map[y-2][x-2]] || com.mans[map[y-2][x-2]].my!=my)) d.push([x-2,y-2]);
+		if ( y-2>= 0 && x-2>= 0 && !map[y-1][x-1] && (!com.mans[map[y-2][x-2]] || com.mans[map[y-2][x-2]].my!=my)) d.push([x-2,y-2]);
 	}
 	return d;
 }
@@ -517,36 +568,30 @@ com.bylaw.s = function (x,y,map,my){
 //将
 com.bylaw.j = function (x,y,map,my){
 	var d=[];
-	var isNull=(function (y1,y2){
-		var y1=com.mans["j0"].y;
-		var x1=com.mans["J0"].x;
-		var y2=com.mans["J0"].y;
-		for (var i=y1-1; i>y2; i--){
-			if (map[i][x1]) return false;
-		}
-		return true;
-	})();
 	
 	if (my===1){ //红方
 		//下
 		if ( y+1<= 9  && (!com.mans[map[y+1][x]] || com.mans[map[y+1][x]].my!=my)) d.push([x,y+1]);
 		//上
 		if ( y-1>= 7 && (!com.mans[map[y-1][x]] || com.mans[map[y-1][x]].my!=my)) d.push([x,y-1]);
-		//老将对老将的情况
-		if ( com.mans["j0"].x == com.mans["J0"].x &&isNull) d.push([com.mans["J0"].x,com.mans["J0"].y]);
-		
 	}else{
 		//下
 		if ( y+1<= 2  && (!com.mans[map[y+1][x]] || com.mans[map[y+1][x]].my!=my)) d.push([x,y+1]);
 		//上
 		if ( y-1>= 0 && (!com.mans[map[y-1][x]] || com.mans[map[y-1][x]].my!=my)) d.push([x,y-1]);
-		//老将对老将的情况
-		if ( com.mans["j0"].x == com.mans["J0"].x &&isNull) d.push([com.mans["j0"].x,com.mans["j0"].y]);
 	}
 	//右
 	if ( x+1<= 5  && (!com.mans[map[y][x+1]] || com.mans[map[y][x+1]].my!=my)) d.push([x+1,y]);
 	//左
 	if ( x-1>= 3 && (!com.mans[map[y][x-1]] || com.mans[map[y][x-1]].my!=my))d.push([x-1,y]);
+	// 将帅同列且中间没有棋子时，可以直接照面吃将
+	var step = my === 1 ? -1 : 1;
+	for (var i=y+step; i>=0 && i<=9; i+=step){
+		if (map[i][x]){
+			if (map[i][x] == (my === 1 ? "J0" : "j0")) d.push([x,i]);
+			break;
+		}
+	}
 	return d;
 }
 
@@ -768,8 +813,8 @@ com.args={
 	'z':{text:"兵", img:'r_z', my:1 ,bl:"z", value:com.value.z},
 	
 	//蓝子
-	'C':{text:"�", img:'b_c', my:-1 ,bl:"c", value:com.value.C},
-	'M':{text:"�R", img:'b_m', my:-1 ,bl:"m", value:com.value.M},
+	'C':{text:"车", img:'b_c', my:-1 ,bl:"c", value:com.value.C},
+	'M':{text:"马", img:'b_m', my:-1 ,bl:"m", value:com.value.M},
 	'X':{text:"象", img:'b_x', my:-1 ,bl:"x", value:com.value.X},
 	'S':{text:"士", img:'b_s', my:-1 ,bl:"s", value:com.value.S},
 	'J':{text:"帅", img:'b_j', my:-1 ,bl:"j", value:com.value.J},
@@ -802,7 +847,7 @@ com.class.Man = function (key, x, y){
 	
 	this.bl = function (map){
 		var map = map || play.map
-		return com.bylaw[o.bl](this.x,this.y,map,this.my)
+		return com.getLegalMoves(map,this.key,this.x,this.y)
 	}
 }
 
@@ -844,4 +889,3 @@ com.class.Dot = function (img, x, y){
 }
 
 com.init();
-

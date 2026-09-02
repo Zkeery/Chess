@@ -3,6 +3,7 @@
 var play = play||{};
 
 play.init = function (depth, map){
+	play.cancelPendingAI();
 	var map = map || com.initMap;
 	var depth = depth || 3
 	play.my				=	1;				//玩家方
@@ -18,6 +19,10 @@ play.init = function (depth, map){
 	play.isOffensive	=	true;			//是否先手
 	play.depth			=	depth;			//搜索深度
 	play.isFoul			=	false;			//是否犯规长将
+	play.isThinking		=	false;
+	play.gameId			=	(play.gameId || 0) + 1;
+	play.useGambit		=	map === com.initMap;
+	AI.historyBill		=	play.useGambit ? com.gambit : [];
 	com.pane.isShow		=	 false;			//隐藏方块
 	
 	//清除所有旗子
@@ -91,11 +96,36 @@ play.init = function (depth, map){
 	
 }
 
+play.cancelPendingAI = function (){
+	if (play.pendingAI){
+		clearTimeout(play.pendingAI);
+		play.pendingAI = null;
+	}
+	play.isThinking = false;
+}
+
+play.scheduleAI = function (){
+	play.cancelPendingAI();
+	play.isThinking = true;
+	var gameId = play.gameId;
+	play.pendingAI = setTimeout(function (){
+		play.pendingAI = null;
+		if (!play.isPlay || gameId != play.gameId) return;
+		play.AIPlay();
+	},500);
+}
+
 
 
 //悔棋
 play.regret = function (){
-	var map  = com.arr2Clone(com.initMap);
+	var undoCount = play.isThinking ? 1 : 2;
+	play.cancelPendingAI();
+	var map  = com.arr2Clone(play.nowMap || com.initMap);
+	for (var manKey in com.mans){
+		com.mans[manKey].isShow = false;
+		com.mans[manKey].alpha = 1;
+	}
 	//初始化所有棋子
 	for (var i=0; i<map.length; i++){
 		for (var n=0; n<map[i].length; n++){
@@ -108,8 +138,7 @@ play.regret = function (){
 		}
 	}
 	var pace= play.pace;
-	pace.pop();
-	pace.pop();
+	while (undoCount-- > 0 && pace.length) pace.pop();
 	
 	for (var i=0; i<pace.length; i++){
 		var p= pace[i].split("")
@@ -138,6 +167,8 @@ play.regret = function (){
 	play.map = map;
 	play.my=1;
 	play.isPlay=true;
+	play.isThinking=false;
+	com.pane.isShow = pace.length > 0;
 	com.show();
 }
 
@@ -145,7 +176,7 @@ play.regret = function (){
 
 //点击棋盘事件
 play.clickCanvas = function (e){
-	if (!play.isPlay) return false;
+	if (!play.isPlay || play.isThinking) return false;
 	var key = play.getClickMan(e);
 	var point = play.getClickPoint(e);
 	
@@ -183,9 +214,9 @@ play.clickMan = function (key,x,y){
 			com.dot.dots = [];
 			com.show()
 			com.get("clickAudio").play();
-			setTimeout(play.AIPlay,500);
 			if (key == "j0") play.showWin (-1);
-			if (key == "J0") play.showWin (1);
+			else if (key == "J0") play.showWin (1);
+			else play.scheduleAI();
 		}
 	// 选中棋子
 	}else{
@@ -222,7 +253,7 @@ play.clickPoint = function (x,y){
 			com.dot.dots = [];
 			com.show();
 			com.get("clickAudio").play();
-			setTimeout(play.AIPlay,500);
+			play.scheduleAI();
 		}else{
 			//alert("不能这么走哦！")
 		}
@@ -232,7 +263,7 @@ play.clickPoint = function (x,y){
 
 //Ai自动走棋
 play.AIPlay = function (){
-	//return
+	if (!play.isPlay) return;
 	play.my = -1 ;
 	var pace=AI.init(play.pace.join(""))
 	if (!pace) {
@@ -250,6 +281,8 @@ play.AIPlay = function (){
 		play.AIclickPoint(pace[2],pace[3]);
 	}
 	com.get("clickAudio").play();
+	play.my = 1;
+	play.isThinking = false;
 	
 	
 }
@@ -311,9 +344,11 @@ play.indexOfPs = function (ps,xy){
 
 //获得点击的着点
 play.getClickPoint = function (e){
-	var domXY = com.getDomXY(com.canvas);
-	var x=Math.round((e.pageX-domXY.x-com.pointStartX-20)/com.spaceX)
-	var y=Math.round((e.pageY-domXY.y-com.pointStartY-20)/com.spaceY)
+	var rect = com.canvas.getBoundingClientRect();
+	var scaleX = com.canvas.width / rect.width;
+	var scaleY = com.canvas.height / rect.height;
+	var x=Math.round(((e.clientX-rect.left)*scaleX-com.pointStartX-20)/com.spaceX)
+	var y=Math.round(((e.clientY-rect.top)*scaleY-com.pointStartY-20)/com.spaceY)
 	return {"x":x,"y":y}
 }
 
@@ -327,6 +362,7 @@ play.getClickMan = function (e){
 }
 
 play.showWin = function (my){
+	play.cancelPendingAI();
 	play.isPlay = false;
 	if (my===1){
 		alert("恭喜你，你赢了！");
@@ -334,4 +370,3 @@ play.showWin = function (my){
 		alert("很遗憾，你输了！");
 	}
 }
-

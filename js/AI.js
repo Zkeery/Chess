@@ -7,7 +7,7 @@ AI.historyTable	=	{};		//历史表
 
 //人工智能初始化
 AI.init = function(pace){
-	var bill = AI.historyBill || com.gambit; //开局库
+	var bill = play.useGambit ? (AI.historyBill || com.gambit) : []; //开局库
 	if (bill.length){
 		var len=pace.length;
 		var arr=[];
@@ -32,7 +32,7 @@ AI.init = function(pace){
 	//AI.treeDepth=4;
 	
 	AI.number=0;
-	AI.setHistoryTable.lenght = 0
+	AI.setHistoryTable.length = 0
 
 	var val=AI.getAlphaBeta(-99999 ,99999, AI.treeDepth, com.arr2Clone(play.map),play.my);
 	//var val = AI.iterativeSearch(com.arr2Clone(play.map),play.my)
@@ -197,7 +197,7 @@ AI.getAlphaBeta = function (A, B, depth, map ,my) {
 
 //奖着法记录到历史表
 AI.setHistoryTable = function (txtMap,depth,value,my){
-	AI.setHistoryTable.lenght ++;
+	AI.setHistoryTable.length ++;
 	AI.historyTable[txtMap] = {depth:depth,value:value}
 }
 
@@ -218,5 +218,4 @@ AI.evaluate = function (map,my){
 	AI.number++;
 	return val*my;
 }
-
 

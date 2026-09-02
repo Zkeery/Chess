@@ -1,0 +1,7 @@
+{
+  "name": "html5-chess",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
